@@ -40,7 +40,7 @@ jobs:
           sed -i '' 's/"INFOPLIST_KEY_CFBundleDisplayName": "SpektraLab"/"INFOPLIST_KEY_CFBundleDisplayName": "\\"SpektraLab Dev\\""/' gen_project.py
           grep -n CFBundleDisplayName gen_project.py
           python3 gen_project.py --bundle-id com.spektralab.mac.dev
-          xcodebuild -project SpektraLab.xcodeproj -scheme SpektraLab -configuration Debug \
+          xcodebuild -project SpektraLab.xcodeproj -scheme SpektraLab -configuration Release \
             -destination 'platform=macOS,variant=Mac Catalyst' -jobs 4 \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" build
 

@@ -55,11 +55,14 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
     case watermark = "watermark"
     /// 解码's parts (2.4.1): 色温, 色调 (each with its As Shot), and the decode's curve. What `.decode` was, one by one.
     case decodeTemperature = "decodeTemperature", decodeTint = "decodeTint", decodeCurve = "decodeCurve"
+    /// Decode's Tone: Highlight, Shadow, White and Black (`SceneTone`). A part of its own, not one of `.decode`'s
+    /// three (a clip from before it says nothing of it, so pasting one leaves the target's Tone as it is).
+    case decodeTone = "decodeTone"
 
     var id: String { rawValue }
 
     /// The sheet's Decode, a box over these: the Decode section's parts, in its order (曝光 · 白平衡's two · 曲线).
-    static let decodeParts: [ClipboardGroup] = [.filmExposure, .decodeTemperature, .decodeTint, .decodeCurve]
+    static let decodeParts: [ClipboardGroup] = [.filmExposure, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve]
     /// What `.decode` meant until 2.4.1, and still means where it is read.
     static let decodeLeaves: Set<ClipboardGroup> = [.decodeTemperature, .decodeTint, .decodeCurve]
 
@@ -81,7 +84,7 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         // for it would be a box for something that cannot be seen. Decode is the white balance
         // and the curve.
         [.filmAndPaper, .filmExposure, .format, .filmEdgeAndDateBack, .hdr, .watermark,
-         .enlarger, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash, .light, .curve, .colour, .lens]
+         .enlarger, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash, .light, .curve, .colour, .lens]
             .filter { $0 != .filmEdgeAndDateBack || FeatureFlags.filmEdge || FeatureFlags.dateBack }
             .filter { $0 != .lens || EngineFeatures.offers(.softFilter) || EngineFeatures.offers(.lensCharacter) }
     }
@@ -128,6 +131,7 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         case .decodeTemperature: L("Temperature")
         case .decodeTint: L("Tint")
         case .decodeCurve: L("Decode Curve")
+        case .decodeTone: L("Tone")
         case .light, .curve, .colour: layer2Tool?.title ?? ""
         }
     }
@@ -175,6 +179,11 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
             return edit.decode.tintAsShot ? L("As Shot") : Fmt.signed(edit.decode.tint, decimals: 0)
         case .decodeCurve:
             return p.sceneCurve.isIdentity ? L("Off") : L("Curve")
+        case .decodeTone:
+            let t = p.sceneTone
+            let parts = [(L("Highlight"), t.highlight), (L("Shadow"), t.shadow), (L("White"), t.white), (L("Black"), t.black)]
+                .filter { $0.1 != 0 }.map { $0.0 + " " + Fmt.signed($0.1, decimals: 0) }
+            return parts.isEmpty ? L("Off") : parts.joined(separator: Fmt.dot)
         case .enlarger: return Fmt.signed(p.printBrightnessStops) + " EV" + Fmt.dot + Fmt.signed(p.yFilterShift) + Fmt.dot + Fmt.signed(p.mFilterShift)
         case .couplers: return Fmt.times(p.effects.couplers)
         case .preflash: return String(format: "%.3f", p.preflashExposure)
@@ -391,6 +400,7 @@ struct SettingsClip: Codable, Equatable, Sendable {
         else if temperature { out.decode.takeTemperature(from: s.decode) }
         else if tint { out.decode.takeTint(from: s.decode) }
         if decodeAll || groups.contains(.decodeCurve) { out.params.sceneCurve = s.params.sceneCurve }
+        if groups.contains(.decodeTone) { out.params.sceneTone = s.params.sceneTone }
         if groups.contains(.enlarger) {
             out.params.printBrightnessStops = s.params.printBrightnessStops
             out.params.yFilterShift = s.params.yFilterShift; out.params.mFilterShift = s.params.mFilterShift

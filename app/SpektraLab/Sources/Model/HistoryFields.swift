@@ -233,6 +233,19 @@ enum HistoryFields {
             r.edit.decode.tintAsShot ? HistoryLabel("Tint", valueKey: "As Shot") : HistoryLabel("Tint", value: Fmt.signed(r.edit.decode.tint, decimals: 0))
         },
         f("edit.params.sceneCurve", .decode, { $0.edit.params.sceneCurve }) { _ in HistoryLabel("Curve") },
+        // Decode's Tone: Highlight, Shadow, White, Black, each its own step.
+        f("edit.params.sceneTone.highlight", .decode, { $0.edit.params.sceneTone.highlight }) { r in
+            HistoryLabel("Highlight", value: Fmt.signed(r.edit.params.sceneTone.highlight, decimals: 0))
+        },
+        f("edit.params.sceneTone.shadow", .decode, { $0.edit.params.sceneTone.shadow }) { r in
+            HistoryLabel("Shadow", value: Fmt.signed(r.edit.params.sceneTone.shadow, decimals: 0))
+        },
+        f("edit.params.sceneTone.white", .decode, { $0.edit.params.sceneTone.white }) { r in
+            HistoryLabel("White", value: Fmt.signed(r.edit.params.sceneTone.white, decimals: 0))
+        },
+        f("edit.params.sceneTone.black", .decode, { $0.edit.params.sceneTone.black }) { r in
+            HistoryLabel("Black", value: Fmt.signed(r.edit.params.sceneTone.black, decimals: 0))
+        },
         // Film, Paper.
         f("edit.params.filmStock", .film, { $0.edit.params.filmStock }) { r in HistoryLabel("Film", value: stock(r.edit.params.filmStock)) },
         f("edit.params.antihalationRemoved", .film, { $0.edit.params.antihalationRemoved }) { r in
