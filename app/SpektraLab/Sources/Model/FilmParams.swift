@@ -592,6 +592,30 @@ struct EffectStrengths: Codable, Equatable, Sendable {
     }
 }
 
+/// **Tone**: Capture One-style High Dynamic Range — Highlight, Shadow, White and Black, -100…100 — on the
+/// scene before the film (the engine's `tone_*`, `scene_tone.cpp`). An edge-aware local gain on the
+/// scene's luminance, fitted to Capture One 16.8's own sliders (c1-hdr-lab): Highlight and White pull
+/// bright areas down by their surroundings, not one curve for the whole picture, so a sky comes down
+/// while a face beside it keeps its contrast; one gain for R, G and B, so no colour moves. Shoot layer.
+/// Absent from an edit before it, which reads as all zero (off).
+struct SceneTone: Codable, Equatable, Sendable {
+    var highlight: Double = 0
+    var shadow: Double = 0
+    var white: Double = 0
+    var black: Double = 0
+    static let range: ClosedRange<Double> = -100...100
+    var isZero: Bool { highlight == 0 && shadow == 0 && white == 0 && black == 0 }
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        highlight = try c.decodeIfPresent(Double.self, forKey: .highlight) ?? 0
+        shadow = try c.decodeIfPresent(Double.self, forKey: .shadow) ?? 0
+        white = try c.decodeIfPresent(Double.self, forKey: .white) ?? 0
+        black = try c.decodeIfPresent(Double.self, forKey: .black) ?? 0
+    }
+}
+
 struct FilmParams: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case filmStock = "filmStock", printStock = "printStock", exposureCompensationEV = "exposureCompensationEV",
@@ -607,6 +631,7 @@ struct FilmParams: Codable, Equatable, Sendable {
         case digitalIntermediate = "digitalIntermediate"
         case sceneLatitudeOther = "sceneLatitudeOther", placementIsRight = "placementIsRight", pairSplit = "pairSplit",
             sceneCurve = "sceneCurve"
+        case sceneTone = "sceneTone"
     }
 
     // --- stock (shoot for film, print for paper) ---
@@ -791,6 +816,8 @@ struct FilmParams: Codable, Equatable, Sendable {
     /// §17), after Scene Placement's node and before Film Exposure. Shoot layer: an edit re-develops.
     /// Absent from an edit before it, which reads as the identity.
     var sceneCurve = CurveSet()
+    /// Tone (`SceneTone`): Highlight, Shadow, White and Black before the film, under Film Exposure.
+    var sceneTone = SceneTone()
     /// The curve's half range, in stops: the engine's `kSceneCurveStops`, and the Latitude card's.
     static let sceneCurveStops = 8.0
     /// Samples a row of the wire's table: an eighth of a stop apart.
@@ -880,6 +907,7 @@ struct FilmParams: Codable, Equatable, Sendable {
         placementIsRight = try c.decodeIfPresent(Bool.self, forKey: .placementIsRight) ?? false
         pairSplit = try c.decodeIfPresent(Double.self, forKey: .pairSplit) ?? 0
         sceneCurve = try c.decodeIfPresent(CurveSet.self, forKey: .sceneCurve) ?? CurveSet()
+        sceneTone = try c.decodeIfPresent(SceneTone.self, forKey: .sceneTone) ?? SceneTone()
     }
 
     static let `default` = FilmParams()
@@ -947,6 +975,12 @@ struct FilmParams: Codable, Equatable, Sendable {
             // The Decode curve (API-SPEC §17): sent always, "" for none, so that taking a curve
             // off reaches an open session (`step` sends only what the wire still names).
             ("scene_curve", .string(sceneCurveWire), .shoot),
+            // Tone: sent always; all zero is the engine's bypass (no node), so a frame without it
+            // renders as before.
+            ("tone_highlight", .double(sceneTone.highlight.clamped(to: SceneTone.range)), .shoot),
+            ("tone_shadow", .double(sceneTone.shadow.clamped(to: SceneTone.range)), .shoot),
+            ("tone_white", .double(sceneTone.white.clamped(to: SceneTone.range)), .shoot),
+            ("tone_black", .double(sceneTone.black.clamped(to: SceneTone.range)), .shoot),
             // RFC-025, whose halation and glare rows RFC-034 turned into area
             // multipliers (`EffectStrengths`). Sent always, like RFC-024's:
             // every default is the engine's and 1 is a bypass, so the picture

@@ -2272,6 +2272,8 @@ Params medium_probe_params(const Params& session) {
     // edit of the scene; the probe's pipeline holds none, so a stamp left on
     // would refuse it.
     p.camera.scene_layers.clear();
+    // Nor through Tone, which is the person's edit of the scene as the curve is.
+    p.camera.tone_highlight = p.camera.tone_shadow = p.camera.tone_white = p.camera.tone_black = 0.0;
     if (!p.enlarger.print_exposure_compensation) p.camera.exposure_compensation_ev = 0.0;
     // A slide's HDR scan (API-SPEC §19.1) is an output choice made over the
     // film, not the film: the stretch puts the clear base at page white, the
@@ -2541,7 +2543,9 @@ spk_status spk_scene_latitude(spk_session* session, const char* request_json, ch
                       sl.b_highlight_room, sl.b_shadow_knee, sl.b_shadow_room, cam.exposure_compensation_ev);
         const std::string scene_key = meter_key(session->params) + base.norm + "|" + ev_text +
                                       (has_region ? region_text : "") + transform_text + sl.norm + "|" +
-                                      cam.scene_curve;
+                                      cam.scene_curve + "|tone" + std::to_string(cam.tone_highlight) + "," +
+                                      std::to_string(cam.tone_shadow) + "," + std::to_string(cam.tone_white) + "," +
+                                      std::to_string(cam.tone_black);
         if (cache.scene_key != scene_key) {
             Image small;
             std::vector<double> E;

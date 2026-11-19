@@ -273,7 +273,7 @@ struct DevelopWorkspace: View {
     /// What Film & Paper's ↺ puts back: the whole of Decode — Film Exposure, the white balance, the
     /// curve — and a Scene Placement the frame was given before the curve replaced it (2026-10-24),
     /// which nothing else on the page can take off any more. The stocks stay.
-    static let decodeScopes: [PageResetScope] = [.filmExposure, .decode, .sceneCurve, .placement]
+    static let decodeScopes: [PageResetScope] = [.filmExposure, .tone, .decode, .sceneCurve, .placement]
 
     /// Several resets as one step of the page's Undo, each the page's own (`AppServices.resetPage`).
     func resetScopes(_ scopes: [PageResetScope]) {

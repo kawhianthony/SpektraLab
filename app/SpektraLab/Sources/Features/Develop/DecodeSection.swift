@@ -66,6 +66,8 @@ struct DecodeSection: View {
     static let chips: CGFloat = 44
     /// Each part's own height under the chips.
     static let exposureHeight: CGFloat = 52
+    /// Tone's four sliders, each an Exposure row.
+    static let toneHeight: CGFloat = 4 * exposureHeight
     /// The host's; a wide window's stacked part is `CurveTool.wideHeight`.
     static let curveHeight: CGFloat = 248
     /// The white balance's first ruler's label, from the top of its band.
@@ -75,6 +77,7 @@ struct DecodeSection: View {
         header + chips + {
             switch tool {
             case .exposure: exposureHeight
+            case .tone: toneHeight
             case .whiteBalance: ScenePanel.embeddedHeight
             case .curve: curveHeight
             }
@@ -161,6 +164,13 @@ struct DecodeSection: View {
         }
     }
 
+    /// Tone's rows, in Capture One's order.
+    static var toneRows: [(title: String, key: WritableKeyPath<SceneTone, Double>)] {
+        [
+            (L("Highlight"), \.highlight), (L("Shadow"), \.shadow), (L("White"), \.white), (L("Black"), \.black),
+        ]
+    }
+
     @ViewBuilder private func part(_ tool: DecodeTool) -> some View {
         switch tool {
         case .exposure:
@@ -168,6 +178,18 @@ struct DecodeSection: View {
                        range: -8...8, text: { Fmt.signed($0) + " EV" }, detentAtRest: true, editing: session.editing(.shoot))
                 .padding(.horizontal, 16)
                 .frame(height: Self.exposureHeight, alignment: .top)
+        case .tone:
+            // Capture One's High Dynamic Range, before the film: Highlight and White pull bright areas down
+            // by their surroundings, Shadow and Black lift dark ones (`SceneTone`, the engine's `tone_*`).
+            VStack(spacing: 0) {
+                ForEach(Self.toneRows, id: \.title) { row in
+                    EditSlider(title: row.title, value: session.binding((\FrameEdit.params.sceneTone).appending(path: row.key)),
+                               range: SceneTone.range, detentAtRest: true, editing: session.editing(.shoot))
+                        .frame(height: Self.exposureHeight, alignment: .top)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: Self.toneHeight, alignment: .top)
         case .whiteBalance:
             ScenePanel(session: session, frame: frame, tool: .constant(.whiteBalance),
                        cameraWhiteBalance: cameraWhiteBalance, embedded: true)

@@ -179,11 +179,23 @@ bool Pipeline::scene_latitude_sample(const Image& in, double ev, std::vector<dou
     if (curved) {
         curved->E.clear();
         for (auto& c : curved->channels) c.clear();
-        curved->present = scene_latitude_wanted() || scene_curve_wanted();
+        curved->present = scene_latitude_wanted() || scene_curve_wanted()
+#ifdef __APPLE__
+                          || scene_tone_wanted()
+#endif
+            ;
         if (curved->present) {
             Image cur, next;
             double s[3] = {gain, gain, gain}, t0[3] = {0.0, 0.0, 0.0};
             if (!blur_.affine(framed, s, t0, cur, error)) return false;
+#ifdef __APPLE__
+            // Tone runs where the render runs it: after the meter's gain, on the
+            // whole frame, before Scene Latitude and the Decode curve.
+            if (scene_tone_wanted()) {
+                if (!node_scene_tone(cur, next, error)) return false;
+                cur = next;
+            }
+#endif
             if (scene_latitude_wanted()) {
                 if (!node_scene_latitude(cur, next, error)) return false;
                 cur = next;

@@ -279,6 +279,14 @@ const SchemaField kFields[] = {
     // default 0 (none: byte for byte as before), after `leak_seed`. It shares
     // the leak's seed, rate, front share and jitter; `leak_amount` is the kind's.
     {"leak_edge",                "film_render.leak.edge",                       F, SHOOT, true, 0.0, 4.0, false},
+    // Tone (Capture One-style High Dynamic Range, `scene_tone.cpp`): the
+    // scene's Highlight, Shadow, White and Black before the film. Native-only,
+    // SHOOT (the negative's exposure), not live, after `leak_edge`; all four 0
+    // (the default) render byte for byte as before.
+    {"tone_highlight",           "camera.tone_highlight",                       F, SHOOT, true, -100.0, 100.0, false},
+    {"tone_shadow",              "camera.tone_shadow",                          F, SHOOT, true, -100.0, 100.0, false},
+    {"tone_white",               "camera.tone_white",                           F, SHOOT, true, -100.0, 100.0, false},
+    {"tone_black",               "camera.tone_black",                           F, SHOOT, true, -100.0, 100.0, false},
     // The app's *preview resolution*: the `live` tier's long edge, and so the
     // size every interactive edit renders at. PRINT layer, because it is a
     // decision about the canvas rather than about the film -- but it is one of
@@ -300,6 +308,10 @@ const SchemaField* find_field(const std::string& name) {
 
 double* float_slot(Params& p, const std::string& path) {
     if (path == "camera.exposure_compensation_ev") return &p.camera.exposure_compensation_ev;
+    if (path == "camera.tone_highlight") return &p.camera.tone_highlight;
+    if (path == "camera.tone_shadow") return &p.camera.tone_shadow;
+    if (path == "camera.tone_white") return &p.camera.tone_white;
+    if (path == "camera.tone_black") return &p.camera.tone_black;
     if (path == "camera.film_format_mm") return &p.camera.film_format_mm;
     if (path == "camera.lens_blur_um") return &p.camera.lens_blur_um;
     if (path == "film_render.halation.halation_amount") return &p.film_render.halation.halation_amount;

@@ -423,6 +423,14 @@ struct CameraParams {
     /// rather than developed on the masks of the stroke before. Native only;
     /// "" = no layers, and the node is not dispatched.
     std::string scene_layers;
+    /// Tone (Capture One-style High Dynamic Range): Highlight, Shadow, White and
+    /// Black, -100..100, on the scene before the film (`scene_tone.cpp`). An
+    /// edge-aware local gain on luminance, the same for R, G and B. Native only;
+    /// all four 0 = off, and the node is not dispatched.
+    double tone_highlight = 0.0;
+    double tone_shadow = 0.0;
+    double tone_white = 0.0;
+    double tone_black = 0.0;
 };
 
 struct EnlargerParams {

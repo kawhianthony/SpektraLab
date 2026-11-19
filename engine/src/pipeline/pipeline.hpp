@@ -902,6 +902,12 @@ private:
     // `camera.scene_layers` is "".
     bool scene_layers_wanted() const;
     bool node_scene_layers(const Image& in, Image& out, std::string& error);
+    // Tone (`scene_tone.cpp`): Capture One-style Highlight, Shadow, White and
+    // Black. Whole-frame (an edge-aware blur of the scene's log luminance), so
+    // it runs at the end of `film_prefix`, after the meter and before any
+    // stage the striped executor cuts; not dispatched while all four are 0.
+    bool scene_tone_wanted() const;
+    bool node_scene_tone(const Image& in, Image& out, std::string& error);
     // The geometry node's constants for `g` on an `in_h` x `in_w` frame, as
     // `spk_geometry_resample_df` reads them: `consts` the eight (hi, lo)
     // pairs, `meta` {SH, SW, OH, OW, turns, flips}. One function, read by

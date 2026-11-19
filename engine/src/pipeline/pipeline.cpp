@@ -561,6 +561,9 @@ bool Pipeline::build(const Params& params, std::string& error) {
     node_count_ += params_.io.input_cctf_decoding ? 1 : 0;               // decode_input
     node_count_ += params_.io.geometry.is_identity() ? 0 : 1;            // geometry
     node_count_ += params_.camera.auto_exposure ? 1 : 0;                 // auto_exposure
+#ifdef __APPLE__
+    node_count_ += scene_tone_wanted() ? 1 : 0;                          // Tone
+#endif
     node_count_ += 1;                                                    // crop_rescale
     node_count_ += scene_latitude_wanted() ? 1 : 0;                      // RFC-023
     node_count_ += scene_layers_wanted() ? 1 : 0;                        // RFC-052's 场景 layers
@@ -2394,6 +2397,12 @@ bool Pipeline::film_prefix(const Image& in, const FrameShape& frame, Image& cur,
     SPK_NODE(node_decode_input(cur, next, error)); cur = next;
     SPK_NODE(node_geometry(cur, next, error)); cur = next;
     SPK_NODE(node_auto_exposure(cur, next, error)); cur = next;
+#ifdef __APPLE__
+    // Tone: after the meter (its axis is the metered mid-grey, moved by Film
+    // Exposure as the Decode curve's is) and on the whole frame, since its mask
+    // is a blur -- `film_prefix` is never striped.
+    if (scene_tone_wanted()) { SPK_NODE(node_scene_tone(cur, next, error)); cur = next; }
+#endif
 
     // `preprocess.crop_rescale`: at the shipped defaults its only job is to
     // fix the film's pixel pitch, which every micrometre-specified effect

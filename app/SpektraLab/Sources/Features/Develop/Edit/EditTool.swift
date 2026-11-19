@@ -341,13 +341,14 @@ struct DevelopPageNavigation: Equatable, Sendable {
     mutating func closeAdjust() { adjust = nil }
 }
 
-/// Decode's three parts, in its chips' order.
+/// Decode's parts, in its chips' order. Tone (Highlight, Shadow, White, Black) sits under Exposure.
 enum DecodeTool: String, CaseIterable, Identifiable, Sendable {
-    case exposure, whiteBalance, curve
+    case exposure, tone, whiteBalance, curve
     var id: String { rawValue }
     var title: String {
         switch self {
         case .exposure: L("Exposure")
+        case .tone: L("Tone")
         case .whiteBalance: L("White Balance")
         case .curve: L("Curve")
         }
@@ -356,6 +357,7 @@ enum DecodeTool: String, CaseIterable, Identifiable, Sendable {
     var scope: PageResetScope {
         switch self {
         case .exposure: .filmExposure
+        case .tone: .tone
         case .whiteBalance: .decode
         case .curve: .sceneCurve
         }

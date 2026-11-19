@@ -619,6 +619,8 @@ struct FrameEdit: Codable, Equatable, Sendable {
 /// RFC-039: a page owns explicit leaves, never an entire surface or effects struct.
 enum PageResetScope: String, CaseIterable, Sendable, Identifiable {
     case filmExposure, format, light, curve, colour, enlarger, placement, decode, sceneCurve, couplers, effects, preflash, crop, filmEdge, dateBack
+    /// Decode's Tone: Highlight, Shadow, White and Black.
+    case tone
     /// 冲洗 › 格式 › 效果's 漏光 (PRD-D §3.3), reset with the format's effects.
     case leak
     /// 编辑 › 镜头 (PRD-D §3.4): the vignette (Layer 2's) and the 柔光镜 and 像差.
@@ -635,6 +637,7 @@ enum PageResetScope: String, CaseIterable, Sendable, Identifiable {
         case .placement: L("Scene Placement")
         case .decode: L("White Balance")
         case .sceneCurve: L("Decode Curve")
+        case .tone: L("Tone")
         case .couplers: L("Couplers")
         case .effects: L("Effects")
         case .preflash: L("Pre-flash")
@@ -677,6 +680,7 @@ extension FrameEdit {
             e.decode.setAsShot()
             e.decode.lensFields = lens
         case .sceneCurve: e.params.sceneCurve = CurveSet()
+        case .tone: e.params.sceneTone = SceneTone()
         case .couplers:
             e.params.effects.couplers = d.effects.couplers
             e.params.effects.couplersActive = d.effects.couplersActive
