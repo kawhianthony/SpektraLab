@@ -1,0 +1,60 @@
+# SpektraLab Dev: build the Mac app on GitHub's Xcode 27 runner and keep it as a downloadable
+# artifact, for a Mac that cannot run Xcode 27 itself. Separate bundle id and name, so it never
+# shares settings or library data with an installed SpektraLab.
+name: Dev build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [hdr-tone]
+
+concurrency:
+  group: dev-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac-app:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          x=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -v -i -E "candidate|beta" | sort -V | tail -1)
+          if [ -z "$x" ]; then echo "::error::no Xcode 27 on this runner image"; ls -d /Applications/Xcode*.app; exit 1; fi
+          sudo xcode-select -s "$x"
+          xcodebuild -version
+
+      - name: Metal toolchain
+        run: |
+          xcrun -sdk macosx metal --version || xcodebuild -downloadComponent MetalToolchain
+          xcrun -sdk macosx --find metallib
+
+      - name: Engine for Mac Catalyst
+        run: app/SpektraLab/tools/build_engine_mac.sh
+
+      - name: App
+        working-directory: app/SpektraLab
+        run: |
+          sed -i '' 's/"INFOPLIST_KEY_CFBundleDisplayName": "SpektraLab"/"INFOPLIST_KEY_CFBundleDisplayName": "\\"SpektraLab Dev\\""/' gen_project.py
+          grep -n CFBundleDisplayName gen_project.py
+          python3 gen_project.py --bundle-id com.spektralab.mac.dev
+          xcodebuild -project SpektraLab.xcodeproj -scheme SpektraLab -configuration Debug \
+            -destination 'platform=macOS,variant=Mac Catalyst' -jobs 4 \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" build
+
+      - name: Package
+        run: |
+          app=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 2 -name "SpektraLab.app" -type d | head -1)
+          echo "built: $app"
+          mkdir -p out && ditto "$app" "out/SpektraLab Dev.app"
+          codesign -dv "out/SpektraLab Dev.app" 2>&1 | head -5 || true
+          plutil -p "out/SpektraLab Dev.app/Contents/Info.plist" | grep -E "CFBundle(Identifier|DisplayName|ShortVersion)|LSMinimumSystemVersion" || true
+          cd out && ditto -c -k --keepParent "SpektraLab Dev.app" "SpektraLab-Dev-${GITHUB_SHA::7}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpektraLab-Dev-${{ github.sha }}
+          path: out/*.zip
+          retention-days: 14
