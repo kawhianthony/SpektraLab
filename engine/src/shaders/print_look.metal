@@ -74,30 +74,76 @@ kernel void spk_look_noise(device const uint* meta [[buffer(0)]],
     out[3u * i + 2u] = rng.normal();
 }
 
-// mono: (fine, coarse, -); colf / colc: colour fine / coarse RGB, all blurred.
-// p: {amount, shadows, midtones, highlights, color, norm_fine, norm_coarse, toe, -, -}
-kernel void spk_look_grain(device const float* rgb [[buffer(0)]],
-                           device const float* mono [[buffer(1)]],
-                           device const float* colf [[buffer(2)]],
-                           device const float* colc [[buffer(3)]],
-                           device const float* p [[buffer(4)]],
-                           device const uint* count [[buffer(5)]],
-                           device float* out [[buffer(6)]],
-                           uint3 thread_position_in_grid [[thread_position_in_grid]]) {
+// sRGB transfer, linear <-> encoded, per channel (sign-symmetric). meta: {count, 1 = encode / 0 = decode}
+static inline float look_srgb_enc(float x) {
+    float a = abs(x);
+    float e = a <= 0.0031308f ? 12.92f * a : 1.055f * pow(a, 1.0f / 2.4f) - 0.055f;
+    return x < 0.0f ? -e : e;
+}
+static inline float look_srgb_dec(float x) {
+    float a = abs(x);
+    float l = a <= 0.04045f ? a / 12.92f : pow((a + 0.055f) / 1.055f, 2.4f);
+    return x < 0.0f ? -l : l;
+}
+kernel void spk_look_srgb(device const float* in [[buffer(0)]],
+                          device const uint* meta [[buffer(1)]],
+                          device float* out [[buffer(2)]],
+                          uint3 thread_position_in_grid [[thread_position_in_grid]]) {
+    uint i = thread_position_in_grid.x;
+    if (i >= meta[0]) return;
+    for (uint c = 0u; c < 3u; ++c)
+        out[3u * i + c] = meta[1] != 0u ? look_srgb_enc(in[3u * i + c]) : look_srgb_dec(in[3u * i + c]);
+}
+
+// A square, zero-phase 2-D filter on all three channels, mirrored at the edges. meta: {w, h, radius, count}
+kernel void spk_look_fir(device const float* in [[buffer(0)]],
+                         device const float* k [[buffer(1)]],
+                         device const uint* meta [[buffer(2)]],
+                         device float* out [[buffer(3)]],
+                         uint3 thread_position_in_grid [[thread_position_in_grid]]) {
+    uint i = thread_position_in_grid.x;
+    if (i >= meta[3]) return;
+    int w = int(meta[0]), h = int(meta[1]), r = int(meta[2]), n = 2 * r + 1;
+    int x = int(i % uint(w)), y = int(i / uint(w));
+    float3 acc = float3(0.0f);
+    for (int dy = -r; dy <= r; ++dy) {
+        int yy = mirror_index(y + dy, h);
+        for (int dx = -r; dx <= r; ++dx) {
+            int xx = mirror_index(x + dx, w);
+            uint j = uint(yy * w + xx);
+            acc += k[(dy + r) * n + (dx + r)] * float3(in[3u * j], in[3u * j + 1u], in[3u * j + 2u]);
+        }
+    }
+    out[3u * i] = acc.x;
+    out[3u * i + 1u] = acc.y;
+    out[3u * i + 2u] = acc.z;
+}
+
+// The measured grain on the sRGB-encoded positive; writes linear.
+// f0: (mono, colour R, colour G), f1: (colour B, -, -), both through the grain filter.
+// t: std[L], shift[L] (encoded units), then {sqrt(1-w), sqrt(w), gR, gG, gB, level0, level step, L}
+kernel void spk_look_grain2(device const float* enc [[buffer(0)]],
+                            device const float* f0 [[buffer(1)]],
+                            device const float* f1 [[buffer(2)]],
+                            device const float* t [[buffer(3)]],
+                            device const uint* count [[buffer(4)]],
+                            device float* out [[buffer(5)]],
+                            uint3 thread_position_in_grid [[thread_position_in_grid]]) {
     uint i = thread_position_in_grid.x;
     if (i >= count[0]) return;
-    float3 c = float3(rgb[3u * i], rgb[3u * i + 1u], rgb[3u * i + 2u]);
-    float nf = p[5], nc = p[6], toe = p[7];
-    float m = 0.8f * mono[3u * i] * nf + 0.6f * mono[3u * i + 1u] * nc;
-    float3 col = 0.8f * float3(colf[3u * i], colf[3u * i + 1u], colf[3u * i + 2u]) * nf
-               + 0.6f * float3(colc[3u * i], colc[3u * i + 1u], colc[3u * i + 2u]) * nc;
-    float cm = p[4] / 100.0f;
-    float3 g = sqrt(1.0f - cm) * m + sqrt(cm) * col;
-    float3 z = look_zones(dot(look_enc(max(c, 0.0f)), kLookY));
-    float strength = (p[1] * z.x + p[2] * z.y + p[3] * z.z) / 50.0f;
-    float k = (p[0] / 100.0f) * 0.6f * 0.6931471805599453f * strength;
-    c = (c + toe) * exp(k * g - 0.5f * k * k) - toe;
-    out[3u * i] = c.x;
-    out[3u * i + 1u] = c.y;
-    out[3u * i + 2u] = c.z;
+    uint L = uint(t[2u * 21u + 7u]);
+    device const float* x = t + 2u * L;
+    float3 e = float3(enc[3u * i], enc[3u * i + 1u], enc[3u * i + 2u]);
+    float l = clamp(dot(e, kLookY), 0.0f, 1.0f);
+    float pos = clamp((l - x[5]) / x[6], 0.0f, float(L - 1u));
+    uint i0 = min(uint(pos), L - 2u);
+    float fr = pos - float(i0);
+    float sd = mix(t[i0], t[i0 + 1u], fr), sh = mix(t[L + i0], t[L + i0 + 1u], fr);
+    float mono = f0[3u * i];
+    float3 col = float3(f0[3u * i + 1u], f0[3u * i + 2u], f1[3u * i]);
+    float3 g = float3(x[2], x[3], x[4]) * (x[0] * mono + x[1] * col);
+    e += sh + sd * g;
+    out[3u * i] = look_srgb_dec(e.x);
+    out[3u * i + 1u] = look_srgb_dec(e.y);
+    out[3u * i + 2u] = look_srgb_dec(e.z);
 }
