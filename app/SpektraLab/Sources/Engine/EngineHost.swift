@@ -172,6 +172,9 @@ final class EngineHost: FrameSource, @unchecked Sendable {
         /// Apply Film Emulation off: the cut Apple's decode is given (`DigitalDecode`) — the whole of the
         /// frame's geometry, the engine taking none of it. Nil: the film, through the engine.
         var digital: Geometry? = nil
+        /// Borders only (`FrameEdit.bordersOnly`): after the engine's render, the gate filled with Apple's decode of the
+        /// frame cut by `cut` (`originalInGate`). The film draws the edge; the picture is the photo's own.
+        var originalInGate = false
         /// Enable HDR's curve: the request `spk_session_hdr_curve` is asked with after the render
         /// (`HDRSessionCurve.request`), its answer delivered before the picture (`.hdrCurve`), or for an export
         /// its file's map's curve (`ExportOrder.gainMap`). The develop
@@ -711,10 +714,49 @@ final class EngineHost: FrameSource, @unchecked Sendable {
     /// A pair on its strip: for the page's canvas, which is told where the two
     /// frames are, and for any job with a frame's own print to cut in there.
     func wantsFilmGeometry(_ job: RenderJob) -> Bool {
+        // Borders only: where the gate is, to fill it with the photo's own picture (`originalInGate`).
+        if let r = request(job.id), r.originalInGate, r.piece == nil, r.strip == nil { return true }
         // A pair's only: a double exposure is one frame in one gate, and nothing is cut in along a hole.
         guard let r = request(job.id), let piece = r.piece, !piece.adds, r.wearsFilm else { return false }
         if case .canvas = r.purpose { return true }
         return !r.layers.isEmpty
+    }
+
+    /// Borders only: the film's render as it is outside the gate, and inside it the frame as Apple decodes it with the
+    /// film off — cut by the film edge's own framing (`cut`), scaled to the gate the engine says it drew, and laid in with
+    /// a feather the width of the gate's penumbra. Before `deliver`, so Edit, turns, crop and marks follow as ever.
+    /// (A first version: the gate is taken as its bounding rectangle — the scan's tilt is under 0.35° — and a date
+    /// printed inside the picture, or a 底片 mark, is covered with it.)
+    func originalInGate(_ job: RenderJob, device: MTLDevice, into base: RenderedPixels) throws {
+        guard let r = request(job.id), r.originalInGate, r.piece == nil, r.strip == nil else { return }
+        guard let said = base.filmGeometry, let gate = FilmGates.rects(said).first else {
+            throw EngineError.failed("the engine did not say where the film's gate is")
+        }
+        let W = base.size.width, H = base.size.height
+        let x0 = Int((gate.minX * Double(W)).rounded()), x1 = Int((gate.maxX * Double(W)).rounded())
+        let y0 = Int((gate.minY * Double(H)).rounded()), y1 = Int((gate.maxY * Double(H)).rounded())
+        guard x1 > x0 + 1, y1 > y0 + 1 else { throw EngineError.failed("the film's gate is empty") }
+        let started = DispatchTime.now().uptimeNanoseconds
+        let picture = try DigitalDecode.render(r.source, isRAW: r.isRAW, decode: r.decode, geometry: r.cut ?? .default,
+                                               canvas: PixelSize(width: x1 - x0, height: y1 - y0), device: device,
+                                               layers: nil, lens: r.lens)
+        let feather = max(PrintCut.feather, 2 * Self.penumbraPixels(said))
+        let written = PrintCut.place(picture.rgba16, stride: picture.rowStridePixels,
+                                     width: picture.size.width, height: picture.size.height,
+                                     into: UnsafeMutablePointer(mutating: base.rgba16), stride: base.rowStridePixels,
+                                     baseWidth: W, baseHeight: H, x: x0, y: y0, feather: feather)
+        if let written { try carry(written, into: base) }
+        withExtendedLifetime(picture) {}
+        let ms = Double(DispatchTime.now().uptimeNanoseconds - started) / 1e6
+        log.info("borders only: the photo's own picture in the gate, \(x1 - x0) x \(y1 - y0) in \(ms, format: .fixed(precision: 0)) ms")
+    }
+
+    /// The gate's penumbra in canvas pixels, from `spk_overscan_geometry`'s reply (`penumbra_mm` / `mm_per_px`); 0 if absent.
+    static func penumbraPixels(_ json: String) -> Double {
+        guard let reply = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
+              let mm = (reply["penumbra_mm"] as? NSNumber)?.doubleValue,
+              let perPx = (reply["mm_per_px"] as? NSNumber)?.doubleValue, perPx > 0 else { return 0 }
+        return mm / perPx
     }
 
     func cut(_ job: RenderJob, layer index: Int, _ layer: RenderedPixels, into base: RenderedPixels) throws {

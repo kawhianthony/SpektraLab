@@ -225,7 +225,7 @@ final class EngineRouter {
                                origin: frame.stampOrigin,
                                lens: LensCorrection.word(source: frame.developSource, fileName: frame.fileName, decode: edit.decode,
                                                          isRAW: frame.developsFromRAW),
-                               base: WatermarkComposite.Base.word(edit, isComposite: false))
+                               base: WatermarkComposite.Base.word(edit, isComposite: false) + edit.bordersOnlyWord)
     }
 
     // MARK: an original that stays in Photos
@@ -462,7 +462,7 @@ final class EngineRouter {
         let base = WatermarkComposite.Base(edit, isComposite: false)
         let stamp = DevelopStamp.of(wire: wire, cut: cut, turns: turns, decode: edit.decode, isRAW: frame.developsFromRAW,
                                     longEdge: longEdge ?? frame.originalSize.longEdge, engine: identity,
-                                    origin: frame.stampOrigin, lens: lens?.word ?? "", base: base?.key ?? "")
+                                    origin: frame.stampOrigin, lens: lens?.word ?? "", base: (base?.key ?? "") + edit.bordersOnlyWord)
         var request = EngineHost.Request(frameID: frame.id, source: source, isRAW: frame.developsFromRAW,
                                          decode: edit.decode, longEdge: longEdge, cut: cut, wire: wire, turnsAfter: turns,
                                          stamp: stamp, purpose: purpose == .canvas ? .canvas : .keep, proxy: proxy)
@@ -472,6 +472,7 @@ final class EngineRouter {
         // The 场景 layers the wire names, captured with the rest (`wire` put their stamp in it).
         request.sceneLayers = sceneAsk(frame, edit: edit, longEdge: longEdge, cut: cut)
         if !edit.appliesFilm { request.digital = cut ?? edit.geometry }
+        request.originalInGate = edit.bordersOnly
         // The page's canvas asks for Enable HDR's curve with a develop where its HDR is drawn (`curveWithDevelop`);
         // otherwise the page asks once the edit settles (`OpenFrameSession.askCurve`), not with every develop.
         if purpose == .canvas, Self.curveWithDevelop(edit) { request.hdrCurve = HDRSessionCurve.request(for: edit) }
@@ -1108,6 +1109,7 @@ final class EngineRouter {
         // whose curve (or second rendition) needs the session a kept render has not.
         if job.tier == .full, !order.gainMap { request.fullRender = fullAsk(frame, plan: plan, source: source, isRAW: isRAW, lens: request.lens) }
         if !edit.appliesFilm { request.digital = plan.cut ?? (plan.engineCuts ? edit.geometry : .default) }
+        request.originalInGate = edit.bordersOnly
         // 水印's 成片 marks, laid over the finished picture last (`WatermarkRules.finished`: a single photograph's own;
         // a pair's and a double's requests above carry none).
         request.watermarks = WatermarkRules.finished(edit, isComposite: frame.isComposite)
@@ -1158,7 +1160,8 @@ final class EngineRouter {
         let lens = given ?? (isRAW ? LensResolver.current(source, fileName: frame.fileName, decode: frame.edit.decode) : nil)
         let stamp = DevelopStamp.of(wire: wire, cut: plan.cut, turns: plan.turnsAfter, decode: frame.edit.decode, isRAW: isRAW,
                                     longEdge: plan.decodeLongEdge ?? 0, engine: identity, origin: frame.stampOrigin,
-                                    lens: lens?.word ?? "", base: WatermarkComposite.Base.word(frame.edit, isComposite: frame.isComposite))
+                                    lens: lens?.word ?? "", base: WatermarkComposite.Base.word(frame.edit, isComposite: frame.isComposite)
+                                        + frame.edit.bordersOnlyWord)
             + "|\(plan.engineCanvas.width)x\(plan.engineCanvas.height)|\(source.lastPathComponent)"
         return FullRender.Ask(url: folder.appendingPathComponent(FullRender.fileName(frame: frame.id, stamp: stamp)), stamp: stamp, lens: lens)
     }
@@ -1180,6 +1183,7 @@ final class EngineRouter {
         // and Apple's decode made it with none.
         request.sceneLayers = sceneAsk(frame, edit: frame.edit, longEdge: plan.decodeLongEdge, cut: plan.cut)
         if !frame.edit.appliesFilm { request.digital = plan.cut ?? (plan.engineCuts ? frame.edit.geometry : .default) }
+        request.originalInGate = frame.edit.bordersOnly
         request.base = WatermarkComposite.Base(frame.edit, isComposite: false)
         return hand(host, job, request)
         #else

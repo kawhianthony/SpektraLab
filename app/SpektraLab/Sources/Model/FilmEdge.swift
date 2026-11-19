@@ -463,7 +463,7 @@ struct FilmEdgeSettings: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case active = "active", format = "format", mode = "mode", gate = "gate", holes = "holes", fog = "fog",
             leaks = "leaks", turn = "turn", cameraSeed = "cameraSeed", frameNumber = "frameNumber", framing = "framing",
-            edgeBrightness = "edgeBrightness", perforation = "perforation"
+            edgeBrightness = "edgeBrightness", perforation = "perforation", originalPicture = "originalPicture"
     }
     var active = false
     var format = FilmEdgeFormat.f135
@@ -496,6 +496,10 @@ struct FilmEdgeSettings: Codable, Equatable, Sendable {
     /// 齿孔 on a 120 film edge (`FilmEdgePerforation`): kept, and written only once it is not None, so an edit
     /// without it is the same JSON as before the field existed.
     var perforation = FilmEdgePerforation.none
+    /// **Borders only**: the film edge drawn by the film as ever, and the picture in its gate left as Apple's decode makes
+    /// it with Apply Film Emulation off — the photo's own colours, cut by the film edge's framing, no film and no paper
+    /// (`EngineHost.originalInGate`). Written only when on, so an edit without it is the same JSON as before.
+    var originalPicture = false
 
     static let fogRange = 0.0...4.0
     static let leaksRange = 0.0...4.0
@@ -526,6 +530,7 @@ struct FilmEdgeSettings: Codable, Equatable, Sendable {
         framing = try? c.decodeIfPresent(Geometry.self, forKey: .framing)
         edgeBrightness = try c.decodeIfPresent(Double.self, forKey: .edgeBrightness) ?? d.edgeBrightness
         perforation = (try? c.decodeIfPresent(FilmEdgePerforation.self, forKey: .perforation)) ?? d.perforation
+        originalPicture = try c.decodeIfPresent(Bool.self, forKey: .originalPicture) ?? d.originalPicture
     }
 
     /// As the synthesised encoding wrote it, and `perforation` only when it is not None.
@@ -544,6 +549,7 @@ struct FilmEdgeSettings: Codable, Equatable, Sendable {
         try c.encodeIfPresent(framing, forKey: .framing)
         try c.encode(edgeBrightness, forKey: .edgeBrightness)
         if perforation != .none { try c.encode(perforation, forKey: .perforation) }
+        if originalPicture { try c.encode(originalPicture, forKey: .originalPicture) }
     }
 
     /// A format card picked (the flow's and the column's `pick`): the format, and what it starts with — the
@@ -960,4 +966,13 @@ struct DateBackSettings: Codable, Equatable, Sendable {
         if style == .perfs { fields.append(("date_imprint_data_placement", .string("perfs"), .shoot)) }
         return fields
     }
+}
+
+
+extension FrameEdit {
+    /// **Borders only**: a film edge whose picture is the photo's own (`FilmEdgeSettings.originalPicture`) — the film
+    /// on (it draws the edge), the edge drawn, and the gate filled by Apple's decode (`EngineHost.originalInGate`).
+    var bordersOnly: Bool { appliesFilm && filmEdge.effective && filmEdge.originalPicture }
+    /// Its word in a develop's stamp: another picture in the gate is another develop.
+    var bordersOnlyWord: String { bordersOnly ? "|original-in-gate" : "" }
 }

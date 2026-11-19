@@ -171,6 +171,46 @@ enum PrintCut {
         return Written(columns: columns, rows: rows)
     }
 
+    /// `layer` (`width` by `height`) laid into `base` (`baseWidth` by `baseHeight`) with its top-left pixel at (`x`, `y`):
+    /// wholly the layer from `feather` pixels inside its edge, mixed toward the base across that band, the base at the
+    /// edge itself and beyond (Borders only: the photo's picture in a film's gate). Both four 16-bit channels a pixel, top
+    /// row first, each with its own pitch. Returns what it may have written; nil when the layer misses the base.
+    @discardableResult
+    static func place(_ layer: UnsafePointer<UInt16>, stride layerStride: Int, width: Int, height: Int,
+                      into base: UnsafeMutablePointer<UInt16>, stride baseStride: Int, baseWidth: Int, baseHeight: Int,
+                      x: Int, y: Int, feather: Double) -> Written? {
+        guard width > 0, height > 0, layerStride >= width, baseStride >= baseWidth else { return nil }
+        let c0 = max(x, 0), c1 = min(x + width - 1, baseWidth - 1)
+        let r0 = max(y, 0), r1 = min(y + height - 1, baseHeight - 1)
+        guard c0 <= c1, r0 <= r1 else { return nil }
+        let f = max(feather, 1e-3)
+        // The share of the layer for a pixel `i` of `n` (its centre `i + 0.5` from the nearer edge): 0 at the edge, 1 from `f` in.
+        func share(_ i: Int, _ n: Int) -> Double {
+            let d = min(Double(i) + 0.5, Double(n) - (Double(i) + 0.5))
+            let t = (d / f).clamped(to: 0...1)
+            return t * t * (3 - 2 * t)
+        }
+        let across = (c0...c1).map { share($0 - x, width) }
+        for by in r0...r1 {
+            let down = share(by - y, height)
+            guard down > 0 else { continue }
+            let from = layer + ((by - y) * layerStride + (c0 - x)) * 4
+            let to = base + (by * baseStride + c0) * 4
+            for i in 0..<across.count {
+                let part = min(across[i], down)
+                if part >= 1 {
+                    (to + i * 4).update(from: from + i * 4, count: 4)
+                } else if part > 0 {
+                    for k in (i * 4)..<(i * 4 + 4) {
+                        let film = Double(to[k])
+                        to[k] = UInt16((film + (Double(from[k]) - film) * part).rounded())
+                    }
+                }
+            }
+        }
+        return Written(columns: c0...c1, rows: r0...r1)
+    }
+
     /// The part of a picture a cut may have written: its columns and its
     /// rows, in pixels with a top-left origin.
     struct Written: Equatable, Sendable {

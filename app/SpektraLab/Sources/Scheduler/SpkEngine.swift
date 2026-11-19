@@ -148,6 +148,9 @@ protocol FrameSource: AnyObject {
     /// job's canvas (`RenderedPixels.filmGeometry`): a pair on its strip,
     /// whose frames are where the engine put them and nowhere the host knows.
     func wantsFilmGeometry(_ job: RenderJob) -> Bool
+    /// Borders only: the job's own result, its film's gate filled with the photo's own picture (`EngineHost.originalInGate`).
+    /// After the render and a pair's prints, before anything of the host's sees it. Nothing for any other job.
+    func originalInGate(_ job: RenderJob, device: MTLDevice, into base: RenderedPixels) throws
     /// The job's result already made and kept (`FullRender`): an export whose
     /// render is on disk. Handed to `deliver` in place of a render — nothing
     /// is opened, and the engine is not asked. Nil: render as ever.
@@ -183,6 +186,7 @@ extension FrameSource {
     func printLayers(_ job: RenderJob) -> [[String: ParamValue]] { [] }
     func cut(_ job: RenderJob, layer index: Int, _ layer: RenderedPixels, into base: RenderedPixels) throws {}
     func wantsFilmGeometry(_ job: RenderJob) -> Bool { false }
+    func originalInGate(_ job: RenderJob, device: MTLDevice, into base: RenderedPixels) throws {}
     func cached(_ job: RenderJob, device: MTLDevice) throws -> RenderedPixels? { nil }
     func digital(_ job: RenderJob, device: MTLDevice) throws -> RenderedPixels? { nil }
     func hdrCurveRequest(_ job: RenderJob) -> String? { nil }
@@ -692,6 +696,8 @@ final class SpkEngine: DevelopEngine, @unchecked Sendable {
             seconds += layerSeconds.reduce(0, +)
             highWater = max(highWater, memory().poolHighWater)
         }
+        // Borders only: the gate filled with the photo's own picture, the film's edge kept (`originalInGate`).
+        try source.originalInGate(job, device: device, into: pixels)
         // A slide's HDR rendition: the frame again by `scan_hdr`, beside this result, and the host's map of
         // the two. Not with a pair's own prints (the rendition would lack them: the map is then the curve's).
         if layers.isEmpty, let rendition = source.hdrRendition(job) {

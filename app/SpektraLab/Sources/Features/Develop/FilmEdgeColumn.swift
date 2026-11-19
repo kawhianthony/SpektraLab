@@ -147,6 +147,22 @@ struct FilmEdgeColumn: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 16)
+                    // Borders only: the film draws the edge, the picture in the gate stays the photo's own.
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(L("Original Picture")).font(Theme.Font.ui(12.5, .medium)).foregroundStyle(Theme.text)
+                            Spacer(minLength: 0)
+                            SpkToggle(isOn: Binding(get: { edge.originalPicture },
+                                                    set: { on in session.change { $0.filmEdge.originalPicture = on } }),
+                                      size: .compact)
+                                .accessibilityLabel(L("Original Picture"))
+                                .accessibilityIdentifier("v5.develop.film-edge.original-picture")
+                        }
+                        Text(L("Film borders only: the picture keeps its own colours, no film or paper."))
+                            .font(Theme.Font.ui(11)).foregroundStyle(Theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 6)
                     FilmStepPanel(frame: frame, draft: draft, width: width, pick: pick)
                     EdgeStepPanel(film: model.filmEdge(for: frame, edit: session.edit, forcing: true), draft: draft,
                                   tool: .constant(.gate), width: width, editing: editing, changed: {}, flat: true)
