@@ -616,6 +616,80 @@ struct SceneTone: Codable, Equatable, Sendable {
     }
 }
 
+/// **The print look**: Expand, Print, Color Head and Film Grain on the finished print — controls after
+/// Dehancer's panels, our own maths (the engine's `look_*`, `print_look.cpp`; reference grain-lab/look.py).
+/// Print layer: a change re-prints, it does not re-develop. Every default is the engine's bypass.
+/// Absent from an edit before it, which reads as every default (off).
+struct PrintLook: Codable, Equatable, Sendable {
+    enum CodingKeys: String, CodingKey { case printExposure, tonalContrast, colorDensity, saturation, headYellowBlue, headMagentaGreen, headCyanRed, headShadows, headMidtones, headHighlights, headPreserve, headImpact, blackPoint, whitePoint, grainAmount, grainSize, grainResolution, grainShadows, grainMidtones, grainHighlights, grainColor }
+    var printExposure: Double = 0.0
+    var tonalContrast: Double = 1.0
+    var colorDensity: Double = 0.0
+    var saturation: Double = 100.0
+    var headYellowBlue: Double = 0.0
+    var headMagentaGreen: Double = 0.0
+    var headCyanRed: Double = 0.0
+    var headShadows: Double = 0.0
+    var headMidtones: Double = 0.0
+    var headHighlights: Double = 0.0
+    var headPreserve: Double = 100.0
+    var headImpact: Double = 100.0
+    var blackPoint: Double = 0.0
+    var whitePoint: Double = 100.0
+    var grainAmount: Double = 0.0
+    var grainSize: Double = 16.0
+    var grainResolution: Double = 100.0
+    var grainShadows: Double = 30.0
+    var grainMidtones: Double = 55.0
+    var grainHighlights: Double = 65.0
+    var grainColor: Double = 65.0
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        printExposure = try c.decodeIfPresent(Double.self, forKey: .printExposure) ?? 0.0
+        tonalContrast = try c.decodeIfPresent(Double.self, forKey: .tonalContrast) ?? 1.0
+        colorDensity = try c.decodeIfPresent(Double.self, forKey: .colorDensity) ?? 0.0
+        saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? 100.0
+        headYellowBlue = try c.decodeIfPresent(Double.self, forKey: .headYellowBlue) ?? 0.0
+        headMagentaGreen = try c.decodeIfPresent(Double.self, forKey: .headMagentaGreen) ?? 0.0
+        headCyanRed = try c.decodeIfPresent(Double.self, forKey: .headCyanRed) ?? 0.0
+        headShadows = try c.decodeIfPresent(Double.self, forKey: .headShadows) ?? 0.0
+        headMidtones = try c.decodeIfPresent(Double.self, forKey: .headMidtones) ?? 0.0
+        headHighlights = try c.decodeIfPresent(Double.self, forKey: .headHighlights) ?? 0.0
+        headPreserve = try c.decodeIfPresent(Double.self, forKey: .headPreserve) ?? 100.0
+        headImpact = try c.decodeIfPresent(Double.self, forKey: .headImpact) ?? 100.0
+        blackPoint = try c.decodeIfPresent(Double.self, forKey: .blackPoint) ?? 0.0
+        whitePoint = try c.decodeIfPresent(Double.self, forKey: .whitePoint) ?? 100.0
+        grainAmount = try c.decodeIfPresent(Double.self, forKey: .grainAmount) ?? 0.0
+        grainSize = try c.decodeIfPresent(Double.self, forKey: .grainSize) ?? 16.0
+        grainResolution = try c.decodeIfPresent(Double.self, forKey: .grainResolution) ?? 100.0
+        grainShadows = try c.decodeIfPresent(Double.self, forKey: .grainShadows) ?? 30.0
+        grainMidtones = try c.decodeIfPresent(Double.self, forKey: .grainMidtones) ?? 55.0
+        grainHighlights = try c.decodeIfPresent(Double.self, forKey: .grainHighlights) ?? 65.0
+        grainColor = try c.decodeIfPresent(Double.self, forKey: .grainColor) ?? 65.0
+    }
+    /// The film grain's controls back to rest (amount 0: off).
+    mutating func resetGrain() {
+        let d = PrintLook()
+        grainAmount = d.grainAmount; grainSize = d.grainSize; grainResolution = d.grainResolution
+        grainShadows = d.grainShadows; grainMidtones = d.grainMidtones; grainHighlights = d.grainHighlights
+        grainColor = d.grainColor
+    }
+    mutating func resetExpand() { let d = PrintLook(); blackPoint = d.blackPoint; whitePoint = d.whitePoint }
+    mutating func resetPrint() {
+        let d = PrintLook()
+        printExposure = d.printExposure; tonalContrast = d.tonalContrast; colorDensity = d.colorDensity
+        saturation = d.saturation
+    }
+    mutating func resetHead() {
+        let d = PrintLook()
+        headYellowBlue = d.headYellowBlue; headMagentaGreen = d.headMagentaGreen; headCyanRed = d.headCyanRed
+        headShadows = d.headShadows; headMidtones = d.headMidtones; headHighlights = d.headHighlights
+        headPreserve = d.headPreserve; headImpact = d.headImpact
+    }
+}
+
 struct FilmParams: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case filmStock = "filmStock", printStock = "printStock", exposureCompensationEV = "exposureCompensationEV",
@@ -632,6 +706,7 @@ struct FilmParams: Codable, Equatable, Sendable {
         case sceneLatitudeOther = "sceneLatitudeOther", placementIsRight = "placementIsRight", pairSplit = "pairSplit",
             sceneCurve = "sceneCurve"
         case sceneTone = "sceneTone"
+        case printLook = "printLook"
     }
 
     // --- stock (shoot for film, print for paper) ---
@@ -818,6 +893,8 @@ struct FilmParams: Codable, Equatable, Sendable {
     var sceneCurve = CurveSet()
     /// Tone (`SceneTone`): Highlight, Shadow, White and Black before the film, under Film Exposure.
     var sceneTone = SceneTone()
+    /// The print look (`PrintLook`): Expand, Print, Color Head, Film Grain on the finished print.
+    var printLook = PrintLook()
     /// The curve's half range, in stops: the engine's `kSceneCurveStops`, and the Latitude card's.
     static let sceneCurveStops = 8.0
     /// Samples a row of the wire's table: an eighth of a stop apart.
@@ -908,6 +985,7 @@ struct FilmParams: Codable, Equatable, Sendable {
         pairSplit = try c.decodeIfPresent(Double.self, forKey: .pairSplit) ?? 0
         sceneCurve = try c.decodeIfPresent(CurveSet.self, forKey: .sceneCurve) ?? CurveSet()
         sceneTone = try c.decodeIfPresent(SceneTone.self, forKey: .sceneTone) ?? SceneTone()
+        printLook = try c.decodeIfPresent(PrintLook.self, forKey: .printLook) ?? PrintLook()
     }
 
     static let `default` = FilmParams()
@@ -981,6 +1059,28 @@ struct FilmParams: Codable, Equatable, Sendable {
             ("tone_shadow", .double(sceneTone.shadow.clamped(to: SceneTone.range)), .shoot),
             ("tone_white", .double(sceneTone.white.clamped(to: SceneTone.range)), .shoot),
             ("tone_black", .double(sceneTone.black.clamped(to: SceneTone.range)), .shoot),
+            // The print look: sent always; every default is the engine's bypass.
+            ("look_print_exposure", .double(printLook.printExposure.clamped(to: -3.0...3.0)), .print),
+            ("look_tonal_contrast", .double(printLook.tonalContrast.clamped(to: 0.5...2.0)), .print),
+            ("look_color_density", .double(printLook.colorDensity.clamped(to: -100.0...100.0)), .print),
+            ("look_saturation", .double(printLook.saturation.clamped(to: 0.0...200.0)), .print),
+            ("look_head_yellow_blue", .double(printLook.headYellowBlue.clamped(to: -50.0...50.0)), .print),
+            ("look_head_magenta_green", .double(printLook.headMagentaGreen.clamped(to: -50.0...50.0)), .print),
+            ("look_head_cyan_red", .double(printLook.headCyanRed.clamped(to: -50.0...50.0)), .print),
+            ("look_head_shadows", .double(printLook.headShadows.clamped(to: -100.0...100.0)), .print),
+            ("look_head_midtones", .double(printLook.headMidtones.clamped(to: -100.0...100.0)), .print),
+            ("look_head_highlights", .double(printLook.headHighlights.clamped(to: -100.0...100.0)), .print),
+            ("look_head_preserve", .double(printLook.headPreserve.clamped(to: 0.0...100.0)), .print),
+            ("look_head_impact", .double(printLook.headImpact.clamped(to: 0.0...100.0)), .print),
+            ("look_black_point", .double(printLook.blackPoint.clamped(to: -20.0...30.0)), .print),
+            ("look_white_point", .double(printLook.whitePoint.clamped(to: 30.0...120.0)), .print),
+            ("look_grain_amount", .double(printLook.grainAmount.clamped(to: 0.0...100.0)), .print),
+            ("look_grain_size", .double(printLook.grainSize.clamped(to: 1.0...48.0)), .print),
+            ("look_grain_resolution", .double(printLook.grainResolution.clamped(to: 0.0...100.0)), .print),
+            ("look_grain_shadows", .double(printLook.grainShadows.clamped(to: 0.0...100.0)), .print),
+            ("look_grain_midtones", .double(printLook.grainMidtones.clamped(to: 0.0...100.0)), .print),
+            ("look_grain_highlights", .double(printLook.grainHighlights.clamped(to: 0.0...100.0)), .print),
+            ("look_grain_color", .double(printLook.grainColor.clamped(to: 0.0...100.0)), .print),
             // RFC-025, whose halation and glare rows RFC-034 turned into area
             // multipliers (`EffectStrengths`). Sent always, like RFC-024's:
             // every default is the engine's and 1 is a bypass, so the picture

@@ -321,6 +321,33 @@ struct ContrastMaskParams {
 
 bool is_known_contrast_mask_scheme(const std::string& scheme);
 
+/// The print look (`print_look.cpp`): Expand, Print, Color Head and a positive Film Grain on the
+/// finished print, before the output encoding -- controls after Dehancer's panels, our own maths.
+/// Every default is a bypass: the stage is not dispatched.
+struct PrintLookParams {
+    double print_exposure = 0.0;
+    double tonal_contrast = 1.0;
+    double color_density = 0.0;
+    double saturation = 100.0;
+    double head_yellow_blue = 0.0;
+    double head_magenta_green = 0.0;
+    double head_cyan_red = 0.0;
+    double head_shadows = 0.0;
+    double head_midtones = 0.0;
+    double head_highlights = 0.0;
+    double head_preserve = 100.0;
+    double head_impact = 100.0;
+    double black_point = 0.0;
+    double white_point = 100.0;
+    double grain_amount = 0.0;
+    double grain_size = 16.0;
+    double grain_resolution = 100.0;
+    double grain_shadows = 30.0;
+    double grain_midtones = 55.0;
+    double grain_highlights = 65.0;
+    double grain_color = 65.0;
+};
+
 struct PrintRenderParams {
     GlareParams glare;
     ContrastMaskParams contrast_mask;
@@ -616,6 +643,7 @@ struct Params {
     std::string print_stock = "kodak_portra_endura";
     FilmRenderParams film_render;
     PrintRenderParams print_render;
+    PrintLookParams print_look;
     CameraParams camera;
     EnlargerParams enlarger;
     ScannerParams scanner;

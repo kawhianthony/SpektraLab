@@ -619,6 +619,10 @@ public:
     bool print_linear(const Chain& in, Chain& out, std::string& error);
     bool print_scan_finish(const Chain& in, Chain& out, std::string& error);
     bool print_output(const Chain& in, Chain& out, std::string& error);
+    // The print look (`print_look.cpp`): Expand, Print, Color Head and Film Grain on the finished
+    // print, a whole-plane stage before `print_output` (its grain and softening are blurs).
+    bool print_look(const Chain& in, Chain& out, std::string& error);
+    bool print_look_wanted() const;
 
     /// §7's **one policy call site**, called from exactly one place
     /// (`strip_plan`). RFC-020's body is constant: the caller's requested

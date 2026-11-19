@@ -2726,6 +2726,7 @@ const Pipeline::Stage Pipeline::kPrintStages[] = {
     {"print_glare",       StageClass::Whole,         &Pipeline::print_glare,       nullptr},
     {"print_linear",      StageClass::Pointwise,     &Pipeline::print_linear,      nullptr},
     {"print_scan_finish", StageClass::Neighbourhood, &Pipeline::print_scan_finish, &Pipeline::print_scan_finish_demand},
+    {"print_look",        StageClass::Whole,         &Pipeline::print_look,        nullptr},
     {"print_output",      StageClass::Pointwise,     &Pipeline::print_output,      nullptr},
 };
 

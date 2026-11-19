@@ -287,6 +287,30 @@ const SchemaField kFields[] = {
     {"tone_shadow",              "camera.tone_shadow",                          F, SHOOT, true, -100.0, 100.0, false},
     {"tone_white",               "camera.tone_white",                           F, SHOOT, true, -100.0, 100.0, false},
     {"tone_black",               "camera.tone_black",                           F, SHOOT, true, -100.0, 100.0, false},
+    // The print look (`print_look.cpp`): Expand, Print, Color Head and Film Grain on the finished
+    // print. Native-only, PRINT (a re-print, not a re-develop), not live, after `tone_black`; every
+    // default is a bypass, byte for byte as before.
+    {"look_print_exposure",       "print_look.print_exposure",                      F, PRINT, true, -3.0, 3.0, false},
+    {"look_tonal_contrast",       "print_look.tonal_contrast",                      F, PRINT, true, 0.5, 2.0, false},
+    {"look_color_density",        "print_look.color_density",                       F, PRINT, true, -100.0, 100.0, false},
+    {"look_saturation",           "print_look.saturation",                          F, PRINT, true, 0.0, 200.0, false},
+    {"look_head_yellow_blue",     "print_look.head_yellow_blue",                    F, PRINT, true, -50.0, 50.0, false},
+    {"look_head_magenta_green",   "print_look.head_magenta_green",                  F, PRINT, true, -50.0, 50.0, false},
+    {"look_head_cyan_red",        "print_look.head_cyan_red",                       F, PRINT, true, -50.0, 50.0, false},
+    {"look_head_shadows",         "print_look.head_shadows",                        F, PRINT, true, -100.0, 100.0, false},
+    {"look_head_midtones",        "print_look.head_midtones",                       F, PRINT, true, -100.0, 100.0, false},
+    {"look_head_highlights",      "print_look.head_highlights",                     F, PRINT, true, -100.0, 100.0, false},
+    {"look_head_preserve",        "print_look.head_preserve",                       F, PRINT, true, 0.0, 100.0, false},
+    {"look_head_impact",          "print_look.head_impact",                         F, PRINT, true, 0.0, 100.0, false},
+    {"look_black_point",          "print_look.black_point",                         F, PRINT, true, -20.0, 30.0, false},
+    {"look_white_point",          "print_look.white_point",                         F, PRINT, true, 30.0, 120.0, false},
+    {"look_grain_amount",         "print_look.grain_amount",                        F, PRINT, true, 0.0, 100.0, false},
+    {"look_grain_size",           "print_look.grain_size",                          F, PRINT, true, 1.0, 48.0, false},
+    {"look_grain_resolution",     "print_look.grain_resolution",                    F, PRINT, true, 0.0, 100.0, false},
+    {"look_grain_shadows",        "print_look.grain_shadows",                       F, PRINT, true, 0.0, 100.0, false},
+    {"look_grain_midtones",       "print_look.grain_midtones",                      F, PRINT, true, 0.0, 100.0, false},
+    {"look_grain_highlights",     "print_look.grain_highlights",                    F, PRINT, true, 0.0, 100.0, false},
+    {"look_grain_color",          "print_look.grain_color",                         F, PRINT, true, 0.0, 100.0, false},
     // The app's *preview resolution*: the `live` tier's long edge, and so the
     // size every interactive edit renders at. PRINT layer, because it is a
     // decision about the canvas rather than about the film -- but it is one of
@@ -309,6 +333,27 @@ const SchemaField* find_field(const std::string& name) {
 double* float_slot(Params& p, const std::string& path) {
     if (path == "camera.exposure_compensation_ev") return &p.camera.exposure_compensation_ev;
     if (path == "camera.tone_highlight") return &p.camera.tone_highlight;
+    if (path == "print_look.print_exposure") return &p.print_look.print_exposure;
+    if (path == "print_look.tonal_contrast") return &p.print_look.tonal_contrast;
+    if (path == "print_look.color_density") return &p.print_look.color_density;
+    if (path == "print_look.saturation") return &p.print_look.saturation;
+    if (path == "print_look.head_yellow_blue") return &p.print_look.head_yellow_blue;
+    if (path == "print_look.head_magenta_green") return &p.print_look.head_magenta_green;
+    if (path == "print_look.head_cyan_red") return &p.print_look.head_cyan_red;
+    if (path == "print_look.head_shadows") return &p.print_look.head_shadows;
+    if (path == "print_look.head_midtones") return &p.print_look.head_midtones;
+    if (path == "print_look.head_highlights") return &p.print_look.head_highlights;
+    if (path == "print_look.head_preserve") return &p.print_look.head_preserve;
+    if (path == "print_look.head_impact") return &p.print_look.head_impact;
+    if (path == "print_look.black_point") return &p.print_look.black_point;
+    if (path == "print_look.white_point") return &p.print_look.white_point;
+    if (path == "print_look.grain_amount") return &p.print_look.grain_amount;
+    if (path == "print_look.grain_size") return &p.print_look.grain_size;
+    if (path == "print_look.grain_resolution") return &p.print_look.grain_resolution;
+    if (path == "print_look.grain_shadows") return &p.print_look.grain_shadows;
+    if (path == "print_look.grain_midtones") return &p.print_look.grain_midtones;
+    if (path == "print_look.grain_highlights") return &p.print_look.grain_highlights;
+    if (path == "print_look.grain_color") return &p.print_look.grain_color;
     if (path == "camera.tone_shadow") return &p.camera.tone_shadow;
     if (path == "camera.tone_white") return &p.camera.tone_white;
     if (path == "camera.tone_black") return &p.camera.tone_black;

@@ -58,6 +58,8 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
     /// Decode's Tone: Highlight, Shadow, White and Black (`SceneTone`). A part of its own, not one of `.decode`'s
     /// three (a clip from before it says nothing of it, so pasting one leaves the target's Tone as it is).
     case decodeTone = "decodeTone"
+    /// The print look's Film Grain, and its Expand + Print + Color Head (`PrintLook`).
+    case filmGrain = "filmGrain", printLook = "printLook"
 
     var id: String { rawValue }
 
@@ -84,7 +86,7 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         // for it would be a box for something that cannot be seen. Decode is the white balance
         // and the curve.
         [.filmAndPaper, .filmExposure, .format, .filmEdgeAndDateBack, .hdr, .watermark,
-         .enlarger, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash, .light, .curve, .colour, .lens]
+         .enlarger, .filmGrain, .printLook, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash, .light, .curve, .colour, .lens]
             .filter { $0 != .filmEdgeAndDateBack || FeatureFlags.filmEdge || FeatureFlags.dateBack }
             .filter { $0 != .lens || EngineFeatures.offers(.softFilter) || EngineFeatures.offers(.lensCharacter) }
     }
@@ -132,6 +134,8 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         case .decodeTint: L("Tint")
         case .decodeCurve: L("Decode Curve")
         case .decodeTone: L("Tone")
+        case .filmGrain: L("Film Grain")
+        case .printLook: L("Expand · Print · Color Head")
         case .light, .curve, .colour: layer2Tool?.title ?? ""
         }
     }
@@ -179,6 +183,14 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
             return edit.decode.tintAsShot ? L("As Shot") : Fmt.signed(edit.decode.tint, decimals: 0)
         case .decodeCurve:
             return p.sceneCurve.isIdentity ? L("Off") : L("Curve")
+        case .filmGrain:
+            let g = p.printLook
+            return g.grainAmount == 0 ? L("Off") : L("Amount") + " " + Fmt.signed(g.grainAmount, decimals: 0).replacingOccurrences(of: "+", with: "")
+                + Fmt.dot + L("Size") + " " + String(format: "%.1f", g.grainSize)
+        case .printLook:
+            var probe = p.printLook
+            probe.resetGrain()
+            return probe == PrintLook() ? L("Off") : L("On")
         case .decodeTone:
             let t = p.sceneTone
             let parts = [(L("Highlight"), t.highlight), (L("Shadow"), t.shadow), (L("White"), t.white), (L("Black"), t.black)]
@@ -401,6 +413,21 @@ struct SettingsClip: Codable, Equatable, Sendable {
         else if tint { out.decode.takeTint(from: s.decode) }
         if decodeAll || groups.contains(.decodeCurve) { out.params.sceneCurve = s.params.sceneCurve }
         if groups.contains(.decodeTone) { out.params.sceneTone = s.params.sceneTone }
+        if groups.contains(.filmGrain) {
+            let g = s.params.printLook
+            out.params.printLook.grainAmount = g.grainAmount; out.params.printLook.grainSize = g.grainSize
+            out.params.printLook.grainResolution = g.grainResolution; out.params.printLook.grainShadows = g.grainShadows
+            out.params.printLook.grainMidtones = g.grainMidtones; out.params.printLook.grainHighlights = g.grainHighlights
+            out.params.printLook.grainColor = g.grainColor
+        }
+        if groups.contains(.printLook) {
+            let grain = out.params.printLook
+            out.params.printLook = s.params.printLook
+            out.params.printLook.grainAmount = grain.grainAmount; out.params.printLook.grainSize = grain.grainSize
+            out.params.printLook.grainResolution = grain.grainResolution; out.params.printLook.grainShadows = grain.grainShadows
+            out.params.printLook.grainMidtones = grain.grainMidtones; out.params.printLook.grainHighlights = grain.grainHighlights
+            out.params.printLook.grainColor = grain.grainColor
+        }
         if groups.contains(.enlarger) {
             out.params.printBrightnessStops = s.params.printBrightnessStops
             out.params.yFilterShift = s.params.yFilterShift; out.params.mFilterShift = s.params.mFilterShift

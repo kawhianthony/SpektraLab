@@ -132,6 +132,8 @@ struct DecodeSection: View {
                     }
                 }
                 EnlargerGroup(session: session)
+                // Film Grain, Expand, Print, Color Head on the finished print (`PrintLookGroups`).
+                PrintLookGroups(session: session)
                 HighDynamicRangeGroup(session: session)
             }
         }
