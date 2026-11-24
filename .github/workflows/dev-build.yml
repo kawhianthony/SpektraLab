@@ -6,7 +6,7 @@ name: Dev build
 on:
   workflow_dispatch:
   push:
-    branches: [hdr-tone]
+    branches: [hdr-tone, feat/paste-original-picture]
 
 concurrency:
   group: dev-build-${{ github.ref }}
