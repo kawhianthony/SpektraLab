@@ -105,8 +105,8 @@ extension Color { init(hexString: String) { self = .gray } }
         // 解码's parts, each its own box (2.4.1, a user's ask relayed by the owner, 2026-11-16): 曝光, 色温, 色调, 曲线
         // under Decode, and 色调 with an As Shot of its own beside 色温's.
         do {
-            let parts: [ClipboardGroup] = [.filmExposure, .decodeTemperature, .decodeTint, .decodeCurve]
-            expect(ClipboardGroup.decodeParts == parts, "Decode's boxes: Exposure, Temperature, Tint, Curve")
+            let parts: [ClipboardGroup] = [.filmExposure, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve]
+            expect(ClipboardGroup.decodeParts == parts, "Decode's boxes: Exposure, Tone, Temperature, Tint, Curve")
             expect(parts.allSatisfy(ClipboardGroup.offered.contains) && !ClipboardGroup.offered.contains(.decode),
                    "the three leaves are offered in Decode's place")
             expect(ClipboardGroup.defaultSelection.isSuperset(of: parts), "ticked when the sheet opens, as Decode was")
@@ -183,6 +183,48 @@ extension Color { init(hexString: String) { self = .gray } }
             // A preset keeps no camera's numbers, per axis.
             let presetMixed = SettingsClip(groups: [.decodeTemperature, .decodeTint], settings: mixedSource, sourceName: "").transferable
             expect(presetMixed.settings.decode.temperature == 6200 && presetMixed.settings.decode.tint == DecodeSettings().tint, "a preset drops an As Shot tint's number")
+        }
+        // Film Edge's Original Picture (borders only): a box of its own under Film Edge & Date Back, so one picture's
+        // borders-only look can be pasted onto many.
+        do {
+            let offered = ClipboardGroup.offered
+            if let e = offered.firstIndex(of: .filmEdgeAndDateBack), let o = offered.firstIndex(of: .originalPicture) {
+                expect(o == e + 1, "Original Picture is offered right after Film Edge & Date Back")
+            } else { expect(false, "Original Picture and Film Edge & Date Back are both offered") }
+            expect(!ClipboardGroup.defaultSelection.contains(.originalPicture), "Original Picture is opt-in, as the film edge is")
+            var borders = FrameEdit()
+            borders.filmEdge.active = true; borders.filmEdge.format = .f6x7; borders.filmEdge.originalPicture = true
+            borders.params.filmStock = "kodak_portra_400"
+            let plain = FrameEdit()   // no film edge, film colours
+            var ownEdge = FrameEdit()
+            ownEdge.filmEdge.active = true; ownEdge.filmEdge.format = .f135; ownEdge.filmEdge.cameraSeed = 5
+            func pasteFrom(_ s: FrameEdit, _ groups: Set<ClipboardGroup>, onto t: FrameEdit) -> FrameEdit {
+                SettingsClip(groups: groups, settings: s, sourceName: "").applied(to: t, picture: PixelSize(width: 6000, height: 4000))
+            }
+            let whole = pasteFrom(borders, [.filmEdgeAndDateBack, .originalPicture], onto: plain)
+            expect(whole.filmEdge.effective && whole.filmEdge.format == .f6x7 && whole.filmEdge.originalPicture && whole.bordersOnly,
+                   "both ticked: the borders-only look travels whole")
+            let edgeOnly = pasteFrom(borders, [.filmEdgeAndDateBack], onto: plain)
+            expect(edgeOnly.filmEdge.effective && !edgeOnly.filmEdge.originalPicture, "the film edge alone leaves the target's switch off")
+            var bordersTarget = plain; bordersTarget.filmEdge.originalPicture = true
+            expect(pasteFrom(ownEdge, [.filmEdgeAndDateBack], onto: bordersTarget).filmEdge.originalPicture,
+                   "and a borders-only target keeps its switch on under another film edge")
+            let switchOnly = pasteFrom(borders, [.originalPicture], onto: ownEdge)
+            expect(switchOnly.filmEdge.originalPicture && switchOnly.filmEdge.format == .f135 && switchOnly.filmEdge.cameraSeed == 5
+                   && switchOnly.bordersOnly, "Original Picture alone flips the switch and keeps the target's own film edge")
+            let off = pasteFrom(plain, [.originalPicture], onto: whole)
+            expect(!off.filmEdge.originalPicture && off.filmEdge.format == .f6x7, "and pastes it off as well as on")
+            expect(pasteFrom(borders, [.filmAndPaper, .light], onto: plain).filmEdge == plain.filmEdge, "without either box the film edge is left alone")
+            expect(ClipboardGroup.originalPicture.summary(of: borders) == "On" && ClipboardGroup.originalPicture.summary(of: plain) == "Off",
+                   "its line says On or Off: \(ClipboardGroup.originalPicture.summary(of: borders))")
+            // ⌘C remembers the tick; a clip and a preset keep it.
+            let d = UserDefaults(suiteName: "spk-v2-original-" + UUID().uuidString)!
+            ClipboardGroup.remember([.filmEdgeAndDateBack, .originalPicture], in: d)
+            expect(ClipboardGroup.remembered(in: d) == [.filmEdgeAndDateBack, .originalPicture], "the ticks ⌘C copies with keep Original Picture")
+            let clip = SettingsClip(groups: [.filmEdgeAndDateBack, .originalPicture], settings: borders, sourceName: "")
+            expect(try JSONDecoder().decode(SettingsClip.self, from: JSONEncoder().encode(clip)) == clip, "a clip with Original Picture reads back the same")
+            expect(clip.transferable.applied(to: plain, picture: PixelSize(width: 4000, height: 6000)).bordersOnly,
+                   "a preset of the borders-only look applies it")
         }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("spk-presets-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

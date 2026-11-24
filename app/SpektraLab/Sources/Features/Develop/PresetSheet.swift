@@ -104,12 +104,16 @@ struct SettingsGroupPicker: View {
     let edit: FrameEdit
     // Decode is Film & Paper's since 2026-10-24 (the exposure, the white balance and the curve); Scene Placement
     // has no control left to set it. HDR is offered only while a screen shows it (`ClipboardGroup.offered`).
-    private let afterDecode: [ClipboardGroup] = [.format, .filmEdgeAndDateBack, .hdr]
+    // Original Picture sits inset under Film Edge & Date Back, the film edge's own switch; Film Grain and the print
+    // look after HDR, in sight rather than folded into the darkroom.
+    private let afterDecode: [ClipboardGroup] = [.format, .filmEdgeAndDateBack, .originalPicture, .hdr, .filmGrain, .printLook]
     private let darkroom: [ClipboardGroup] = [.enlarger, .couplers, .preflash]
     var body: some View {
         row(.filmAndPaper)
         decode
-        ForEach(afterDecode.filter { ClipboardGroup.offered.contains($0) }) { row($0) }
+        ForEach(afterDecode.filter { ClipboardGroup.offered.contains($0) }) { group in
+            row(group).padding(.leading, group == .originalPicture ? 20 : 0)
+        }
         DisclosureGroup(L("Darkroom")) { ForEach(darkroom) { row($0) } }
         ForEach([ClipboardGroup.light, .curve, .colour, .lens].filter { $0.layer2Tool != nil || ClipboardGroup.offered.contains($0) }) { row($0) }
         // PRD-E §9 q10: a copy and a preset carry no mask layer in M1 (`SettingsClip`).

@@ -33,6 +33,11 @@
 //  as its three parts (`expanded`), and all three are written back as `decode` (`stored`), so a copy of all of Decode
 //  is the JSON 2.4.0 wrote and a 2.4.0 build reads it. A paste of Temperature or Tint carries As Shot as a mode
 //  (`DecodeSettings.takeTemperature`, `takeTint`): each target's own camera, never the source's numbers.
+//
+//  **Original Picture** (film edge, borders only): a box of its own under Film Edge & Date Back, unticked when the
+//  sheet opens as the film edge is. Ticked with the film edge it pastes the borders-only look onto many pictures at
+//  once; alone it flips the switch on pictures that keep their own film edges. Film Edge & Date Back without it leaves
+//  each target's switch as it was.
 
 import Foundation
 
@@ -60,6 +65,11 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
     case decodeTone = "decodeTone"
     /// The print look's Film Grain, and its Expand + Print + Color Head (`PrintLook`).
     case filmGrain = "filmGrain", printLook = "printLook"
+    /// Film Edge's **Original Picture** switch (`FilmEdgeSettings.originalPicture`, borders only): a box of its own
+    /// under Film Edge & Date Back, unticked when the sheet opens as the film edge is. Film Edge & Date Back carries
+    /// the film edge without it, so a film edge can be pasted onto borders-only pictures, or the switch alone onto
+    /// pictures that keep their own film edges; both ticked carry the borders-only look whole.
+    case originalPicture = "originalPicture"
 
     var id: String { rawValue }
 
@@ -85,15 +95,24 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         // Scene Placement has no control since the Decode curve replaced it (2026-10-24): a box
         // for it would be a box for something that cannot be seen. Decode is the white balance
         // and the curve.
-        [.filmAndPaper, .filmExposure, .format, .filmEdgeAndDateBack, .hdr, .watermark,
-         .enlarger, .filmGrain, .printLook, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash, .light, .curve, .colour, .lens]
-            .filter { $0 != .filmEdgeAndDateBack || FeatureFlags.filmEdge || FeatureFlags.dateBack }
-            .filter { $0 != .lens || EngineFeatures.offers(.softFilter) || EngineFeatures.offers(.lensCharacter) }
+        let all: [ClipboardGroup] = [.filmAndPaper, .filmExposure, .format, .filmEdgeAndDateBack, .originalPicture, .hdr, .watermark,
+            .enlarger, .filmGrain, .printLook, .decodeTone, .decodeTemperature, .decodeTint, .decodeCurve, .couplers, .preflash,
+            .light, .curve, .colour, .lens]
+        let edge = FeatureFlags.filmEdge, dateBack = FeatureFlags.dateBack
+        let lens = EngineFeatures.offers(.softFilter) || EngineFeatures.offers(.lensCharacter)
+        return all.filter { group -> Bool in
+            switch group {
+            case .filmEdgeAndDateBack: return edge || dateBack
+            case .originalPicture: return edge
+            case .lens: return lens
+            default: return true
+            }
+        }
     }
 
-    /// Ticked when the sheet opens: everything but the film edge, HDR and the watermarks.
+    /// Ticked when the sheet opens: everything but the film edge (and its Original Picture), HDR and the watermarks.
     static var defaultSelection: Set<ClipboardGroup> {
-        Set(offered.filter { $0 != .filmEdgeAndDateBack && $0 != .hdr && $0 != .watermark })
+        Set(offered.filter { $0 != .filmEdgeAndDateBack && $0 != .originalPicture && $0 != .hdr && $0 != .watermark })
     }
 
 
@@ -127,6 +146,7 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
         case .printEffects: L("Print Effects")
         case .scenePlacement: L("Scene Placement")
         case .filmEdgeAndDateBack: L("Film Edge & Date Back")
+        case .originalPicture: L("Original Picture")
         case .hdr: L("High Dynamic Range")
         case .lens: L("Lens", as: "the edit section")
         case .watermark: L("Watermarks")
@@ -221,6 +241,8 @@ enum ClipboardGroup: String, CaseIterable, Codable, Sendable, Identifiable {
             let e = edit.filmEdge.active ? "\(edit.filmEdge.format.label) · \(edit.filmEdge.mode.label)" : L("No film edge")
             let d = edit.dateBack.active ? L("\(edit.dateBack.style.label) date") : L("No date")
             return "\(e) · \(d)"
+        case .originalPicture:
+            return edit.filmEdge.originalPicture ? L("On") : L("Off")
         case .hdr:
             let hdr = edit.hdr ? L("HDR") + " " + String(format: "%.1f EV", edit.hdrPeak) : L("HDR off")
             return edit.params.extendedDynamicRange ? "EDR" + Fmt.dot + hdr : hdr
@@ -375,8 +397,10 @@ struct SettingsClip: Codable, Equatable, Sendable {
         if groups.contains(.filmEdgeAndDateBack) {
             // The film and its date travel; the picture's place in the gate
             // is this frame's own, as a crop is, and a frame keeps its body.
-            let (framing, body) = (out.filmEdge.framing, out.filmEdge.cameraSeed)
+            // Original Picture is a box of its own (below): without it the frame keeps its own switch.
+            let (framing, body, original) = (out.filmEdge.framing, out.filmEdge.cameraSeed, out.filmEdge.originalPicture)
             out.filmEdge = s.filmEdge
+            out.filmEdge.originalPicture = original
             // And the film lies the way *this* picture does (the owner, 2026-11-05: an upright
             // picture's film edge pasted onto a wide one came out upright). What travels is the
             // source's turn against its own picture's lie (`turn(of:from:onto:)`).
@@ -385,6 +409,7 @@ struct SettingsClip: Codable, Equatable, Sendable {
             if body > 0 { out.filmEdge.cameraSeed = body }
             out.dateBack = s.dateBack
         }
+        if groups.contains(.originalPicture) { out.filmEdge.originalPicture = s.filmEdge.originalPicture }
         if groups.contains(.filmExposure) {
             let meterChanged = out.params.autoExposure != s.params.autoExposure || out.params.autoExposureMethod != s.params.autoExposureMethod
             out.params.autoExposure = s.params.autoExposure
